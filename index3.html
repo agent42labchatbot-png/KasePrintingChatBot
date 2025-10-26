@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kase Printing Assistant</title>
+    <style>
+        :root {
+            --kase-white: #ffffff; --kase-text-dark: #333333; --kase-accent-blue: #3298dc;
+            --kase-accent-sage: #8fa8a2; --kase-light-gray: #f1f3f5; --kase-border-gray: #e0e0e0;
+            --kase-user-message-bg: #eaf5fc;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--kase-white); color: var(--kase-text-dark); margin: 0; height: 100vh; overflow: hidden; }
+        #chat-container { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+        .aurora-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1; }
+        .aurora-background span { position: absolute; display: block; width: 40vw; height: 40vw; min-width: 300px; min-height: 300px; border-radius: 50%; filter: blur(120px); opacity: 0.3; }
+        .aurora-background span:nth-child(1) { background: var(--kase-accent-sage); animation: move-aurora-1 18s linear infinite; }
+        .aurora-background span:nth-child(2) { background: var(--kase-accent-blue); animation: move-aurora-2 20s linear infinite; }
+        .aurora-background span:nth-child(3) { background: #cddce8; animation: move-aurora-3 22s linear infinite; }
+        @keyframes move-aurora-1 { 0% { transform: translate(10vw, 10vh); } 50% { transform: translate(60vw, 70vh); } 100% { transform: translate(10vw, 10vh); } }
+        @keyframes move-aurora-2 { 0% { transform: translate(80vw, 20vh); } 50% { transform: translate(20vw, 60vh); } 100% { transform: translate(80vw, 20vh); } }
+        @keyframes move-aurora-3 { 0% { transform: translate(50vw, 80vh); } 50% { transform: translate(30vw, 10vh); } 100% { transform: translate(50vw, 80vh); } }
+
+        /* --- FIX: Corrected scroll container layout --- */
+        #chat-content {
+            width: 100%;
+            flex-grow: 1;
+            display: flex; /* This is necessary for the margin-top: auto trick to work */
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            scroll-behavior: smooth;
+            /* REMOVED: justify-content: flex-end; This was the line causing the problem. */
+        }
+        
+        /* --- FIX: Added a wrapper to push content to the bottom --- */
+        #chat-inner-wrapper {
+            margin-top: auto; /* This is the magic that pushes messages to the bottom */
+            width: 100%;
+        }
+
+        #welcome-header { text-align: center; padding: 20px; margin-bottom: 5vh; }
+        #welcome-header h1 { font-size: 2.5em; font-weight: 500; margin: 0 0 10px 0; color: var(--kase-text-dark); }
+        #welcome-header p { font-size: 1.1em; color: #555; max-width: 400px; margin: 0 auto; line-height: 1.5; }
+        #message-list { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 800px; margin: 0 auto; }
+        .message { display: flex; align-items: flex-start; gap: 15px; max-width: 80%; }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--kase-accent-sage); color: white; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; flex-shrink: 0; }
+        .message-content { padding: 12px 16px; border-radius: 18px; line-height: 1.6; color: var(--kase-text-dark); }
+        .user-message { align-self: flex-end; flex-direction: row-reverse; }
+        .user-message .message-content { background: var(--kase-user-message-bg); border-top-right-radius: 6px; }
+        .user-message .avatar { background: #90a4ae; }
+        .bot-message { align-self: flex-start; }
+        .bot-message .message-content { background: var(--kase-light-gray); border-top-left-radius: 6px; }
+        .bot-message.typing .message-content { padding: 16px; }
+        .typing span { height: 8px; width: 8px; background-color: #9e9e9e; border-radius: 50%; display: inline-block; animation: bounce 1.3s infinite; }
+        .typing span:nth-of-type(2) { animation-delay: 0.15s; }
+        .typing span:nth-of-type(3) { animation-delay: 0.3s; }
+        @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
+        #input-container { width: 100%; padding: 0 20px 30px 20px; flex-shrink: 0; z-index: 10; }
+        .input-wrapper { width: 100%; max-width: 700px; margin: 0 auto; background: var(--kase-white); border: 1px solid var(--kase-border-gray); border-radius: 24px; padding: 8px 8px 8px 20px; display: flex; align-items: center; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); transition: all 0.2s ease; }
+        .input-wrapper:focus-within { border-color: var(--kase-accent-blue); }
+        #chat-input { width: 100%; border: none; background: transparent; padding: 10px 0; font-size: 16px; resize: none; outline: none; color: var(--kase-text-dark); }
+        #chat-input::placeholder { color: #999; }
+        #send-button { width: 40px; height: 40px; background: var(--kase-accent-blue); border: none; border-radius: 16px; cursor: pointer; flex-shrink: 0; margin-left: 10px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        #send-button:hover { background: #2884c0; }
+        #scroll-to-bottom {
+            position: absolute; bottom: 120px; right: 30px; width: 40px; height: 40px;
+            background-color: var(--kase-white); border: 1px solid var(--kase-border-gray);
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); opacity: 0; transform: translateY(10px);
+            transition: opacity 0.3s, transform 0.3s; pointer-events: none;
+        }
+        #scroll-to-bottom.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    </style>
+</head>
+<body>
+<div id="chat-container">
+    <div class="aurora-background"><span></span><span></span><span></span></div>
+    <div id="chat-content">
+        <!-- FIX: Added a wrapper div around the content -->
+        <div id="chat-inner-wrapper">
+            <div id="welcome-header">
+                <h1>Kase Printing Assistant</h1>
+                <p>Your intelligent guide to our printing services. Ask me anything about offset, digital, finishing, or getting a quote.</p>
+            </div>
+            <div id="message-list"></div>
+        </div>
+    </div>
+    <div id="input-container">
+        <div class="input-wrapper">
+            <input type="text" id="chat-input" placeholder="Ask about our services...">
+            <button id="send-button" title="Send message">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 11L12 6L17 11M12 18V7" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+    </div>
+    <button id="scroll-to-bottom" title="Scroll to bottom">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+</div>
+
+<script>
+    const chatContent = document.getElementById('chat-content');
+    const messageList = document.getElementById('message-list');
+    const chatInput = document.getElementById('chat-input');
+    const sendButton = document.getElementById('send-button');
+    const scrollToBottomButton = document.getElementById('scroll-to-bottom');
+
+    const API_URL = 'http://127.0.0.1:8080/chat';
+
+    function generateSessionId() {
+        return 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    }
+    const SESSION_ID = generateSessionId();
+
+    sendButton.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+    });
+
+    chatContent.addEventListener('scroll', () => {
+        const isScrolledUp = chatContent.scrollHeight - chatContent.scrollTop - chatContent.clientHeight > 100;
+        if (isScrolledUp) {
+            scrollToBottomButton.classList.add('visible');
+        } else {
+            scrollToBottomButton.classList.remove('visible');
+        }
+    });
+
+    scrollToBottomButton.addEventListener('click', () => {
+        scrollToBottom();
+    });
+
+    function scrollToBottom() {
+        chatContent.scrollTo({
+            top: chatContent.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+
+    function addMessage(text, sender, isLoading = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', `${sender}-message`);
+        if (isLoading) messageDiv.classList.add('typing');
+        const avatar = document.createElement('div');
+        avatar.classList.add('avatar');
+        avatar.textContent = sender === 'user' ? 'You' : 'KP';
+        const messageContent = document.createElement('div');
+        messageContent.classList.add('message-content');
+        if (isLoading) {
+            messageContent.innerHTML = '<span></span><span></span><span></span>';
+        } else {
+            messageContent.innerText = text;
+        }
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(messageContent);
+        messageList.appendChild(messageDiv);
+        scrollToBottom();
+        return messageDiv;
+    }
+
+    async function sendMessage() {
+        const question = chatInput.value.trim();
+        if (!question) return;
+
+        addMessage(question, 'user');
+        chatInput.value = '';
+        const loadingMessage = addMessage('', 'bot', true);
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: question,
+                    session_id: SESSION_ID
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            loadingMessage.querySelector('.message-content').innerText = data.response;
+            loadingMessage.classList.remove('typing');
+
+        } catch (error) {
+            console.error('Error:', error);
+            loadingMessage.querySelector('.message-content').innerText = error.message || 'Sorry, something went wrong. Please try again.';
+            loadingMessage.classList.remove('typing');
+        } finally {
+            scrollToBottom();
+        }
+    }
+</script>
+</body>
+</html>
