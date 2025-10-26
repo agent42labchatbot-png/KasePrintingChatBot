@@ -107,7 +107,8 @@
     const sendButton = document.getElementById('send-button');
     const scrollToBottomButton = document.getElementById('scroll-to-bottom');
 
-    const API_URL = 'http://127.0.0.1:8080/chat';
+    //const API_URL = 'http://127.0.0.1:8080/chat';
+    const API_URL = 'https://kaseprintingchatbot.onrender.com/chat';  //Api Connection
 
     function generateSessionId() {
         return 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
